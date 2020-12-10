@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="DeckButton">
+        <attr name="buttonId" format="integer" />
+    </declare-styleable>
+</resources>
