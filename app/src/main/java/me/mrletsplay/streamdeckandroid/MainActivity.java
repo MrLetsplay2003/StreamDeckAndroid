@@ -1,39 +1,26 @@
 package me.mrletsplay.streamdeckandroid;
 
-import androidx.appcompat.app.AppCompatActivity;
-
 import android.app.Activity;
-import android.app.AlertDialog;
-import android.content.Context;
-import android.content.res.TypedArray;
-import android.graphics.Bitmap;
+import android.content.SharedPreferences;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
-import android.hardware.usb.UsbDevice;
-import android.hardware.usb.UsbManager;
 import android.os.Bundle;
-import android.os.Looper;
-import android.os.storage.StorageManager;
+import android.view.GestureDetector;
+import android.view.MotionEvent;
 import android.view.View;
-import android.view.Window;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 
-import java.io.IOException;
-import java.net.Socket;
-import java.net.SocketTimeoutException;
+import androidx.appcompat.app.AlertDialog;
+
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Base64;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Random;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
-import me.mrletsplay.mrcore.json.JSONArray;
 import me.mrletsplay.mrcore.json.JSONObject;
-import me.mrletsplay.mrcore.json.JSONType;
 import me.mrletsplay.mrcore.json.converter.JSONConverter;
 import me.mrletsplay.streamdeck.action.Action;
 import me.mrletsplay.streamdeck.action.ActionType;
@@ -49,10 +36,65 @@ public class MainActivity extends Activity {
 	private StreamDeck deck;
 	private List<DeckButton> uiButtons;
 
+	private GestureDetector detector;
+
+	private void showSettings(BiConsumer<String, Integer> dataConsumer, Runnable onNoInput) {
+		AlertDialog.Builder b = new AlertDialog.Builder(MainActivity.this)
+				.setTitle("Settings");
+		View v = getLayoutInflater().inflate(R.layout.settings, findViewById(R.id.layout_root), false);
+		EditText hostField = v.findViewById(R.id.settings_host);
+		if(DeckNetworking.getHost() != null) hostField.setText(DeckNetworking.getHost());
+		EditText portField = v.findViewById(R.id.settings_port);
+		portField.setText(String.valueOf(DeckNetworking.getPort()));
+		b.setView(v);
+
+		b.setPositiveButton("Okay", (dialog, which) -> {
+			try {
+				String host = hostField.getText().toString();
+				int port = Integer.parseInt(portField.getText().toString());
+				getSharedPreferences("settings", MODE_PRIVATE).edit()
+						.putString("host", host)
+						.putInt("port", port)
+						.apply();
+				if(dataConsumer != null) dataConsumer.accept(host, port);
+			}catch(NumberFormatException e) {
+				new AlertDialog.Builder(MainActivity.this)
+						.setTitle("Error")
+						.setMessage("Your input was invalid")
+						.setPositiveButton("Okay", (d, w) -> {
+							if(onNoInput != null) onNoInput.run();
+						})
+						.show();
+			}
+		});
+
+		b.setNegativeButton("Cancel", (dialog, which) -> {
+			if(onNoInput != null) onNoInput.run();
+		});
+
+		b.show();
+	}
+
+	private static final BiConsumer<String, Integer> CONNECT_TO_OTHER_HOST = (host, port) -> {
+		DeckNetworking.close();
+		DeckNetworking.setHost(host);
+		DeckNetworking.setPort(port);
+		DeckNetworking.setClosed(false);
+	};
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
+
+		detector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+
+			@Override
+			public void onLongPress(MotionEvent e) {
+				showSettings(CONNECT_TO_OTHER_HOST, null);
+				// Toast.makeText(getApplicationContext(), "This is a very very very very long press", Toast.LENGTH_SHORT).show();
+			}
+		});
 
 		LinearLayout rows = findViewById(R.id.rows);
 
@@ -77,7 +119,18 @@ public class MainActivity extends Activity {
 		}
 
 		deck = new StreamDeck(id);
-		startReceiving();
+
+		SharedPreferences prefs = getSharedPreferences("settings", MODE_PRIVATE);
+		if(!prefs.contains("host") || !prefs.contains("port")) {
+			showSettings((host, port) -> {
+				CONNECT_TO_OTHER_HOST.accept(host, port);
+				startReceiving();
+			}, null);
+		}else {
+			DeckNetworking.setHost(prefs.getString("host", null));
+			DeckNetworking.setPort(prefs.getInt("port", 10238));
+			startReceiving();
+		}
 	}
 
 	private void startReceiving() {
@@ -138,6 +191,10 @@ public class MainActivity extends Activity {
 				runOnUiThread(() -> new AlertDialog.Builder(this)
 						.setNegativeButton(R.string.exit, (dialog, i) -> finish())
 						.setPositiveButton(R.string.reconnect, (dialog, i) -> startReceiving())
+						.setNeutralButton("Settings", (dialog, i) -> showSettings((host, port) -> {
+							CONNECT_TO_OTHER_HOST.accept(host, port);
+							startReceiving();
+						}, null))
 						.setCancelable(false)
 						.setMessage(R.string.connection_lost)
 						.show());
@@ -200,4 +257,8 @@ public class MainActivity extends Activity {
 		}
 	}
 
+	@Override
+	public boolean onTouchEvent(MotionEvent event) {
+		return detector.onTouchEvent(event);
+	}
 }

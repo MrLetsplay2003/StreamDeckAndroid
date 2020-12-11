@@ -3,4 +3,8 @@
     <string name="reconnect">Reconnect</string>
     <string name="exit">Exit</string>
     <string name="connection_lost">Connection lost, reconnect?</string>
+    <string name="settings_host_hint">IP</string>
+    <string name="settings_host_label">Desktop IP</string>
+    <string name="settings_port_label">Desktop Port</string>
+    <string name="settings_port_hint">Default: 10238</string>
 </resources>

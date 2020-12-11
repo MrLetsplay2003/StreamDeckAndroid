@@ -16,7 +16,7 @@
         android:fullBackupContent="true">
         <activity android:name=".MainActivity"
             android:screenOrientation="sensorLandscape"
-            android:theme="@android:style/Theme.Light.NoTitleBar.Fullscreen">
+            android:theme="@style/AppFullScreenTheme">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
